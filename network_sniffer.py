@@ -12,6 +12,7 @@ from datetime import datetime
 from collections import defaultdict
 import signal
 import os
+import traceback
 
 try:
     import scapy.all as scapy
@@ -119,23 +120,23 @@ class NetworkSniffer:
             return "ICMP"
         elif packet.haslayer(scapy.ARP):  # type: ignore
             return "ARP"
-        elif packet.haslayer(scapy.DNS):  # type: ignore
+        elif hasattr(scapy, "DNS") and packet.haslayer(scapy.DNS):  # type: ignore
             return "DNS"
-        elif packet.haslayer(scapy.DHCP):  # type: ignore
+        elif hasattr(scapy, "DHCP") and packet.haslayer(scapy.DHCP):  # type: ignore
             return "DHCP"
-        elif packet.haslayer(scapy.BOOTP):  # type: ignore
+        elif hasattr(scapy, "BOOTP") and packet.haslayer(scapy.BOOTP):  # type: ignore
             return "BOOTP"
-        elif packet.haslayer(scapy.TFTP):  # type: ignore
+        elif hasattr(scapy, "TFTP") and packet.haslayer(scapy.TFTP):  # type: ignore
             return "TFTP"
-        elif packet.haslayer(scapy.SNMP):  # type: ignore
+        elif hasattr(scapy, "SNMP") and packet.haslayer(scapy.SNMP):  # type: ignore
             return "SNMP"
-        elif packet.haslayer(scapy.NTP):  # type: ignore
+        elif hasattr(scapy, "NTP") and packet.haslayer(scapy.NTP):  # type: ignore
             return "NTP"
-        elif packet.haslayer(scapy.IGMP):  # type: ignore
+        elif hasattr(scapy, "IGMP") and packet.haslayer(scapy.IGMP):  # type: ignore
             return "IGMP"
-        elif packet.haslayer(scapy.ICMPv6):  # type: ignore
+        elif hasattr(scapy, "ICMPv6") and packet.haslayer(scapy.ICMPv6):  # type: ignore
             return "ICMPv6"
-        elif packet.haslayer(scapy.DHCPv6):  # type: ignore
+        elif hasattr(scapy, "DHCPv6") and packet.haslayer(scapy.DHCPv6):  # type: ignore
             return "DHCPv6"
         elif packet.haslayer(scapy.IP):  # type: ignore
             if packet[scapy.IP].proto == 2:
@@ -160,11 +161,23 @@ class NetworkSniffer:
     
     def analyze_packet(self, packet):
         """Analyze a single packet and extract useful information"""
-        # Check if packet is valid
-        if packet is None:
-            return {
+        try:
+            # Check if packet is valid
+            if packet is None:
+                return {
+                    'timestamp': datetime.now().strftime('%H:%M:%S.%f')[:-3],
+                    'length': 0,
+                    'protocol': 'Unknown',
+                    'src_ip': 'Unknown',
+                    'dst_ip': 'Unknown',
+                    'src_port': 'N/A',
+                    'dst_port': 'N/A',
+                    'payload': 'No payload'
+                }
+            
+            packet_info = {
                 'timestamp': datetime.now().strftime('%H:%M:%S.%f')[:-3],
-                'length': 0,
+                'length': len(packet) if packet else 0,
                 'protocol': 'Unknown',
                 'src_ip': 'Unknown',
                 'dst_ip': 'Unknown',
@@ -172,71 +185,67 @@ class NetworkSniffer:
                 'dst_port': 'N/A',
                 'payload': 'No payload'
             }
-        
-        packet_info = {
-            'timestamp': datetime.now().strftime('%H:%M:%S.%f')[:-3],
-            'length': len(packet) if packet else 0,
-            'protocol': 'Unknown',
-            'src_ip': 'Unknown',
-            'dst_ip': 'Unknown',
-            'src_port': 'N/A',
-            'dst_port': 'N/A',
-            'payload': 'No payload'
-        }
-        
-        try:
             # Extract IP information
             if packet.haslayer(scapy.IP):  # type: ignore
                 packet_info['src_ip'] = packet[scapy.IP].src  # type: ignore
                 packet_info['dst_ip'] = packet[scapy.IP].dst  # type: ignore
-                self.ip_stats[packet[scapy.IP].src] += 1  # type: ignore
-                self.ip_stats[packet[scapy.IP].dst] += 1  # type: ignore
-            
+                if packet_info['src_ip'] != 'Unknown':
+                    self.ip_stats[packet_info['src_ip']] += 1  # type: ignore
+                if packet_info['dst_ip'] != 'Unknown':
+                    self.ip_stats[packet_info['dst_ip']] += 1  # type: ignore
             # Extract protocol information
             protocol = self.get_protocol_name(packet)
             packet_info['protocol'] = protocol
             self.protocol_stats[protocol] += 1
-            
             # Extract port information
             if packet.haslayer(scapy.TCP):  # type: ignore
                 packet_info['src_port'] = packet[scapy.TCP].sport  # type: ignore
                 packet_info['dst_port'] = packet[scapy.TCP].dport  # type: ignore
-                self.port_stats[f"{packet[scapy.TCP].sport}"] += 1  # type: ignore
-                self.port_stats[f"{packet[scapy.TCP].dport}"] += 1  # type: ignore
+                if str(packet_info['src_port']).isdigit():
+                    self.port_stats[str(packet_info['src_port'])] += 1  # type: ignore
+                if str(packet_info['dst_port']).isdigit():
+                    self.port_stats[str(packet_info['dst_port'])] += 1  # type: ignore
             elif packet.haslayer(scapy.UDP):  # type: ignore
                 packet_info['src_port'] = packet[scapy.UDP].sport  # type: ignore
                 packet_info['dst_port'] = packet[scapy.UDP].dport  # type: ignore
-                self.port_stats[f"{packet[scapy.UDP].sport}"] += 1  # type: ignore
-                self.port_stats[f"{packet[scapy.UDP].dport}"] += 1  # type: ignore
-            
+                if str(packet_info['src_port']).isdigit():
+                    self.port_stats[str(packet_info['src_port'])] += 1  # type: ignore
+                if str(packet_info['dst_port']).isdigit():
+                    self.port_stats[str(packet_info['dst_port'])] += 1  # type: ignore
             # Extract payload
             packet_info['payload'] = self.get_payload_info(packet)
-            
+            return packet_info
         except Exception as e:
-            print(f"{Fore.RED}[!] Error analyzing packet: {e}")
+            print(f"{Fore.RED}[!] Exception in analyze_packet: {e}")
+            traceback.print_exc()
             # Return basic packet info even if analysis fails
-            packet_info['length'] = len(packet) if packet else 0
-        
-        return packet_info
+            return {
+                'timestamp': datetime.now().strftime('%H:%M:%S.%f')[:-3],
+                'length': len(packet) if packet else 0,
+                'protocol': 'Unknown',
+                'src_ip': 'Unknown',
+                'dst_ip': 'Unknown',
+                'src_port': 'N/A',
+                'dst_port': 'N/A',
+                'payload': 'No payload'
+            }
     
     def packet_callback(self, packet):
         """Callback function called for each captured packet"""
         if not self.running:
             return
-        
         try:
             self.packet_count += 1
             packet_info = self.analyze_packet(packet)
             self.captured_packets.append(packet_info)
-            
             # Display packet information
             self.display_packet(packet_info)
-            
             # Keep only last 100 packets in memory
             if len(self.captured_packets) > 100:
                 self.captured_packets.pop(0)
         except Exception as e:
-            print(f"{Fore.RED}[!] Error processing packet: {e}")
+            print(f"{Fore.RED}[!] Exception in packet_callback: {e}")
+            traceback.print_exc()
             # Continue processing other packets
     
     def display_packet(self, packet_info):
@@ -302,21 +311,39 @@ class NetworkSniffer:
         
         # Protocol statistics
         if self.protocol_stats:
+            # Debug: print any None or non-int values
+            bad_protocols = [(protocol, count) for protocol, count in self.protocol_stats.items() if not isinstance(count, int) or count is None]
+            if bad_protocols:
+                print(f"{Fore.RED}[DEBUG] Protocol stats with non-int or None values: {bad_protocols}")
             print(f"\n{Fore.YELLOW}Protocol Distribution:")
-            protocol_data = [[protocol, count] for protocol, count in self.protocol_stats.items()]
+            protocol_data = [[protocol, count] for protocol, count in self.protocol_stats.items() if isinstance(count, int) and count is not None]
             print(tabulate(protocol_data, headers=['Protocol', 'Count'], tablefmt='grid'))
         
         # Top IP addresses
         if self.ip_stats:
+            # Debug: print any None or non-int values
+            bad_ips = [(ip, count) for ip, count in self.ip_stats.items() if not isinstance(count, int) or count is None]
+            if bad_ips:
+                print(f"{Fore.RED}[DEBUG] IP stats with non-int or None values: {bad_ips}")
             print(f"\n{Fore.YELLOW}Top IP Addresses:")
-            top_ips = sorted(self.ip_stats.items(), key=lambda x: x[1] if x[1] is not None else 0, reverse=True)[:10]
+            # Only show valid IPs (not 'Unknown')
+            top_ips = sorted(
+                ((ip, count) for ip, count in self.ip_stats.items() if ip != 'Unknown' and isinstance(count, int) and count is not None),
+                key=lambda x: x[1], reverse=True)[:10]
             ip_data = [[ip, count] for ip, count in top_ips]
             print(tabulate(ip_data, headers=['IP Address', 'Count'], tablefmt='grid'))
         
         # Top ports
         if self.port_stats:
+            # Debug: print any None or non-int values
+            bad_ports = [(port, count) for port, count in self.port_stats.items() if not isinstance(count, int) or count is None]
+            if bad_ports:
+                print(f"{Fore.RED}[DEBUG] Port stats with non-int or None values: {bad_ports}")
             print(f"\n{Fore.YELLOW}Top Ports:")
-            top_ports = sorted(self.port_stats.items(), key=lambda x: x[1] if x[1] is not None else 0, reverse=True)[:10]
+            # Only show numeric ports (not 'N/A')
+            top_ports = sorted(
+                ((port, count) for port, count in self.port_stats.items() if port.isdigit() and isinstance(count, int) and count is not None),
+                key=lambda x: x[1], reverse=True)[:10]
             port_data = [[port, count] for port, count in top_ports]
             print(tabulate(port_data, headers=['Port', 'Count'], tablefmt='grid'))
         
@@ -341,6 +368,8 @@ class NetworkSniffer:
         print(f"{Fore.GREEN}[+] Press Ctrl+C to stop capture")
         print(f"{Fore.CYAN}{'='*60}")
         
+        # Fix: ensure count is always an int for scapy.sniff
+        count = count if count is not None else 0
         try:
             # Start sniffing
             scapy.sniff(  # type: ignore
@@ -355,6 +384,7 @@ class NetworkSniffer:
             pass
         except Exception as e:
             print(f"{Fore.RED}[!] Error during capture: {e}")
+            traceback.print_exc()
             # Continue to display statistics even if there was an error
         finally:
             self.running = False
