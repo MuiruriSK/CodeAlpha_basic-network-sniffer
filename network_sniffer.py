@@ -17,6 +17,7 @@ try:
     import scapy.all as scapy
     from colorama import init, Fore, Back, Style
     from tabulate import tabulate
+    # from scapy.layers.inet import IGMP  # Removed, not needed and causes ImportError
 except ImportError as e:
     print(f"Error: Missing required library. Please install dependencies: {e}")
     print("Run: pip install -r requirements.txt")
@@ -41,10 +42,79 @@ class NetworkSniffer:
         
     def get_protocol_name(self, packet):
         """Extract protocol name from packet"""
+        # First check for built-in Scapy layers
         if packet.haslayer(scapy.TCP):  # type: ignore
-            return "TCP"
+            # Check for common application protocols based on ports
+            if packet.haslayer(scapy.TCP):  # type: ignore
+                tcp_layer = packet[scapy.TCP]  # type: ignore
+                if tcp_layer.sport == 80 or tcp_layer.dport == 80:
+                    return "HTTP"
+                elif tcp_layer.sport == 443 or tcp_layer.dport == 443:
+                    return "HTTPS"
+                elif tcp_layer.sport == 22 or tcp_layer.dport == 22:
+                    return "SSH"
+                elif tcp_layer.sport == 21 or tcp_layer.dport == 21:
+                    return "FTP"
+                elif tcp_layer.sport == 23 or tcp_layer.dport == 23:
+                    return "TELNET"
+                elif tcp_layer.sport == 25 or tcp_layer.dport == 25:
+                    return "SMTP"
+                elif tcp_layer.sport == 110 or tcp_layer.dport == 110:
+                    return "POP3"
+                elif tcp_layer.sport == 143 or tcp_layer.dport == 143:
+                    return "IMAP"
+                elif tcp_layer.sport == 993 or tcp_layer.dport == 993:
+                    return "IMAPS"
+                elif tcp_layer.sport == 995 or tcp_layer.dport == 995:
+                    return "POP3S"
+                elif tcp_layer.sport == 587 or tcp_layer.dport == 587:
+                    return "SMTP-Submission"
+                elif tcp_layer.sport == 465 or tcp_layer.dport == 465:
+                    return "SMTPS"
+                elif tcp_layer.sport == 3389 or tcp_layer.dport == 3389:
+                    return "RDP"
+                elif tcp_layer.sport == 3306 or tcp_layer.dport == 3306:
+                    return "MySQL"
+                elif tcp_layer.sport == 5432 or tcp_layer.dport == 5432:
+                    return "PostgreSQL"
+                elif tcp_layer.sport == 1433 or tcp_layer.dport == 1433:
+                    return "MSSQL"
+                elif tcp_layer.sport == 1521 or tcp_layer.dport == 1521:
+                    return "Oracle"
+                elif tcp_layer.sport == 6379 or tcp_layer.dport == 6379:
+                    return "Redis"
+                elif tcp_layer.sport == 8080 or tcp_layer.dport == 8080:
+                    return "HTTP-Alt"
+                elif tcp_layer.sport == 8443 or tcp_layer.dport == 8443:
+                    return "HTTPS-Alt"
+                elif tcp_layer.sport == 6881 or tcp_layer.dport == 6881:
+                    return "BitTorrent"
+                else:
+                    return "TCP"
         elif packet.haslayer(scapy.UDP):  # type: ignore
-            return "UDP"
+            # Check for common UDP protocols based on ports
+            if packet.haslayer(scapy.UDP):  # type: ignore
+                udp_layer = packet[scapy.UDP]  # type: ignore
+                if udp_layer.sport == 53 or udp_layer.dport == 53:
+                    return "DNS"
+                elif udp_layer.sport == 67 or udp_layer.dport == 67:
+                    return "DHCP-Server"
+                elif udp_layer.sport == 68 or udp_layer.dport == 68:
+                    return "DHCP-Client"
+                elif udp_layer.sport == 69 or udp_layer.dport == 69:
+                    return "TFTP"
+                elif udp_layer.sport == 123 or udp_layer.dport == 123:
+                    return "NTP"
+                elif udp_layer.sport == 161 or udp_layer.dport == 161:
+                    return "SNMP"
+                elif udp_layer.sport == 162 or udp_layer.dport == 162:
+                    return "SNMP-Trap"
+                elif udp_layer.sport == 514 or udp_layer.dport == 514:
+                    return "Syslog"
+                elif udp_layer.sport == 6881 or udp_layer.dport == 6881:
+                    return "BitTorrent"
+                else:
+                    return "UDP"
         elif packet.haslayer(scapy.ICMP):  # type: ignore
             return "ICMP"
         elif packet.haslayer(scapy.ARP):  # type: ignore
@@ -61,80 +131,15 @@ class NetworkSniffer:
             return "SNMP"
         elif packet.haslayer(scapy.NTP):  # type: ignore
             return "NTP"
-        elif packet.haslayer(scapy.SMTP):  # type: ignore
-            return "SMTP"
-        elif packet.haslayer(scapy.POP):  # type: ignore
-            return "POP"
-        elif packet.haslayer(scapy.IMAP):  # type: ignore
-            return "IMAP"
-        elif packet.haslayer(scapy.FTP):  # type: ignore
-            return "FTP"
-        elif packet.haslayer(scapy.SSH):  # type: ignore
-            return "SSH"
-        elif packet.haslayer(scapy.TELNET):  # type: ignore
-            return "TELNET"
-        elif packet.haslayer(scapy.HTTP):  # type: ignore
-            return "HTTP"
-        elif packet.haslayer(scapy.HTTPS):  # type: ignore
-            return "HTTPS"
-        elif packet.haslayer(scapy.RIP):  # type: ignore
-            return "RIP"
-        elif packet.haslayer(scapy.OSPF):  # type: ignore
-            return "OSPF"
-        elif packet.haslayer(scapy.BGP):  # type: ignore
-            return "BGP"
         elif packet.haslayer(scapy.IGMP):  # type: ignore
             return "IGMP"
-        elif packet.haslayer(scapy.EIGRP):  # type: ignore
-            return "EIGRP"
-        elif packet.haslayer(scapy.VRRP):  # type: ignore
-            return "VRRP"
-        elif packet.haslayer(scapy.HSRP):  # type: ignore
-            return "HSRP"
-        elif packet.haslayer(scapy.STP):  # type: ignore
-            return "STP"
-        elif packet.haslayer(scapy.CDP):  # type: ignore
-            return "CDP"
-        elif packet.haslayer(scapy.LLDP):  # type: ignore
-            return "LLDP"
-        elif packet.haslayer(scapy.ISAKMP):  # type: ignore
-            return "ISAKMP"
-        elif packet.haslayer(scapy.IKE):  # type: ignore
-            return "IKE"
-        elif packet.haslayer(scapy.ESP):  # type: ignore
-            return "ESP"
-        elif packet.haslayer(scapy.AH):  # type: ignore
-            return "AH"
-        elif packet.haslayer(scapy.GRE):  # type: ignore
-            return "GRE"
-        elif packet.haslayer(scapy.PPP):  # type: ignore
-            return "PPP"
-        elif packet.haslayer(scapy.PPPoE):  # type: ignore
-            return "PPPoE"
-        elif packet.haslayer(scapy.RADIUS):  # type: ignore
-            return "RADIUS"
-        elif packet.haslayer(scapy.TACACS):  # type: ignore
-            return "TACACS"
-        elif packet.haslayer(scapy.LDAP):  # type: ignore
-            return "LDAP"
-        elif packet.haslayer(scapy.KERBEROS):  # type: ignore
-            return "KERBEROS"
-        elif packet.haslayer(scapy.NFS):  # type: ignore
-            return "NFS"
-        elif packet.haslayer(scapy.SMB):  # type: ignore
-            return "SMB"
-        elif packet.haslayer(scapy.NETBIOS):  # type: ignore
-            return "NETBIOS"
-        elif packet.haslayer(scapy.SYSLOG):  # type: ignore
-            return "SYSLOG"
-        elif packet.haslayer(scapy.SNMP):  # type: ignore
-            return "SNMP"
-        elif packet.haslayer(scapy.DHCPv6):  # type: ignore
-            return "DHCPv6"
         elif packet.haslayer(scapy.ICMPv6):  # type: ignore
             return "ICMPv6"
-        elif packet.haslayer(scapy.NDP):  # type: ignore
-            return "NDP"
+        elif packet.haslayer(scapy.DHCPv6):  # type: ignore
+            return "DHCPv6"
+        elif packet.haslayer(scapy.IP):  # type: ignore
+            if packet[scapy.IP].proto == 2:
+                return "IGMP"
         else:
             return "Other"
     
@@ -244,45 +249,37 @@ class NetworkSniffer:
             'ARP': Fore.MAGENTA,
             'DNS': Fore.CYAN,
             'DHCP': Fore.CYAN,
+            'DHCP-Server': Fore.CYAN,
+            'DHCP-Client': Fore.CYAN,
             'HTTP': Fore.RED,
             'HTTPS': Fore.RED,
+            'HTTP-Alt': Fore.RED,
+            'HTTPS-Alt': Fore.RED,
             'FTP': Fore.RED,
             'SSH': Fore.RED,
             'SMTP': Fore.RED,
-            'POP': Fore.RED,
+            'SMTPS': Fore.RED,
+            'SMTP-Submission': Fore.RED,
+            'POP3': Fore.RED,
+            'POP3S': Fore.RED,
             'IMAP': Fore.RED,
+            'IMAPS': Fore.RED,
             'TELNET': Fore.RED,
+            'RDP': Fore.RED,
+            'MySQL': Fore.RED,
+            'PostgreSQL': Fore.RED,
+            'MSSQL': Fore.RED,
+            'Oracle': Fore.RED,
+            'Redis': Fore.RED,
+            'BitTorrent': Fore.MAGENTA,
             'SNMP': Fore.YELLOW,
+            'SNMP-Trap': Fore.YELLOW,
             'NTP': Fore.YELLOW,
             'TFTP': Fore.YELLOW,
-            'RIP': Fore.MAGENTA,
-            'OSPF': Fore.MAGENTA,
-            'BGP': Fore.MAGENTA,
+            'Syslog': Fore.YELLOW,
             'IGMP': Fore.MAGENTA,
-            'EIGRP': Fore.MAGENTA,
-            'VRRP': Fore.MAGENTA,
-            'HSRP': Fore.MAGENTA,
-            'STP': Fore.MAGENTA,
-            'CDP': Fore.MAGENTA,
-            'LLDP': Fore.MAGENTA,
-            'ISAKMP': Fore.RED,
-            'IKE': Fore.RED,
-            'ESP': Fore.RED,
-            'AH': Fore.RED,
-            'GRE': Fore.MAGENTA,
-            'PPP': Fore.MAGENTA,
-            'PPPoE': Fore.MAGENTA,
-            'RADIUS': Fore.YELLOW,
-            'TACACS': Fore.YELLOW,
-            'LDAP': Fore.YELLOW,
-            'KERBEROS': Fore.RED,
-            'NFS': Fore.YELLOW,
-            'SMB': Fore.YELLOW,
-            'NETBIOS': Fore.YELLOW,
-            'SYSLOG': Fore.YELLOW,
-            'DHCPv6': Fore.CYAN,
             'ICMPv6': Fore.YELLOW,
-            'NDP': Fore.CYAN,
+            'DHCPv6': Fore.CYAN,
             'Other': Fore.WHITE
         }
         
